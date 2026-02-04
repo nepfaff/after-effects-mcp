@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { execSync } from "child_process";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { z } from "zod";
 import { fileURLToPath } from 'url';
@@ -20,12 +21,23 @@ const __dirname = path.dirname(__filename);
 const SCRIPTS_DIR = path.join(__dirname, "scripts");
 const TEMP_DIR = path.join(__dirname, "temp");
 
+// Cross-platform bridge directory shared between Node.js and After Effects.
+// Uses ~/Documents/ae-mcp-bridge/ so both Node (os.homedir) and ExtendScript
+// (Folder.myDocuments) resolve to the same location on Windows and macOS.
+function getBridgeDir(): string {
+  const dir = path.join(os.homedir(), "Documents", "ae-mcp-bridge");
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
 // Headless CLI execution has been removed. All interactions are routed through the Bridge panel.
 
 // Helper function to read results from After Effects temp file
 function readResultsFromTempFile(): string {
   try {
-    const tempFilePath = path.join(process.env.TEMP || process.env.TMP || '', 'ae_mcp_result.json');
+    const tempFilePath = path.join(getBridgeDir(), 'ae_mcp_result.json');
     
     // Add debugging info
     console.error(`Checking for results at: ${tempFilePath}`);
@@ -64,7 +76,7 @@ function readResultsFromTempFile(): string {
 // Helper to wait for a fresh result produced by a specific command
 async function waitForBridgeResult(expectedCommand?: string, timeoutMs: number = 5000, pollMs: number = 250): Promise<string> {
   const start = Date.now();
-  const resultPath = path.join(process.env.TEMP || process.env.TMP || '', 'ae_mcp_result.json');
+  const resultPath = path.join(getBridgeDir(), 'ae_mcp_result.json');
   let lastSize = -1;
 
   while (Date.now() - start < timeoutMs) {
@@ -94,7 +106,7 @@ async function waitForBridgeResult(expectedCommand?: string, timeoutMs: number =
 // Helper function to write command to file
 function writeCommandFile(command: string, args: Record<string, any> = {}): void {
   try {
-    const commandFile = path.join(process.env.TEMP || process.env.TMP || '', 'ae_command.json');
+    const commandFile = path.join(getBridgeDir(), 'ae_command.json');
     const commandData = {
       command,
       args,
@@ -111,7 +123,7 @@ function writeCommandFile(command: string, args: Record<string, any> = {}): void
 // Helper function to clear the results file to avoid stale cache
 function clearResultsFile(): void {
   try {
-    const resultFile = path.join(process.env.TEMP || process.env.TMP || '', 'ae_mcp_result.json');
+    const resultFile = path.join(getBridgeDir(), 'ae_mcp_result.json');
     
     // Write a placeholder message to indicate the file is being reset
     const resetData = {
@@ -515,7 +527,7 @@ server.tool(
     try {
       // Generate a unique timestamp
       const timestamp = new Date().getTime();
-      const tempFile = path.join(process.env.TEMP || process.env.TMP || '', `ae_test_${timestamp}.jsx`);
+      const tempFile = path.join(getBridgeDir(), `ae_test_${timestamp}.jsx`);
       
       // Create a direct test script that doesn't rely on command files
       let scriptContent = "";
@@ -533,7 +545,7 @@ server.tool(
             prop.setValueAtTime(time, value);
             
             // Write direct result
-            var resultFile = new File("${path.join(process.env.TEMP || process.env.TMP || '', 'ae_test_result.txt').replace(/\\/g, '\\\\')}");
+            var resultFile = new File("${path.join(getBridgeDir(), 'ae_test_result.txt').replace(/\\/g, '\\\\')}");
             resultFile.open("w");
             resultFile.write("SUCCESS: Added keyframe at time " + time + " with value " + value);
             resultFile.close();
@@ -541,7 +553,7 @@ server.tool(
             // Visual feedback
             alert("Test successful: Added opacity keyframe at " + time + "s with value " + value + "%");
           } catch (e) {
-            var errorFile = new File("${path.join(process.env.TEMP || process.env.TMP || '', 'ae_test_error.txt').replace(/\\/g, '\\\\')}");
+            var errorFile = new File("${path.join(getBridgeDir(), 'ae_test_error.txt').replace(/\\/g, '\\\\')}");
             errorFile.open("w");
             errorFile.write("ERROR: " + e.toString());
             errorFile.close();
@@ -562,7 +574,7 @@ server.tool(
             prop.expression = expression;
             
             // Write direct result
-            var resultFile = new File("${path.join(process.env.TEMP || process.env.TMP || '', 'ae_test_result.txt').replace(/\\/g, '\\\\')}");
+            var resultFile = new File("${path.join(getBridgeDir(), 'ae_test_result.txt').replace(/\\/g, '\\\\')}");
             resultFile.open("w");
             resultFile.write("SUCCESS: Added expression: " + expression);
             resultFile.close();
@@ -570,7 +582,7 @@ server.tool(
             // Visual feedback
             alert("Test successful: Added position expression: " + expression);
           } catch (e) {
-            var errorFile = new File("${path.join(process.env.TEMP || process.env.TMP || '', 'ae_test_error.txt').replace(/\\/g, '\\\\')}");
+            var errorFile = new File("${path.join(getBridgeDir(), 'ae_test_error.txt').replace(/\\/g, '\\\\')}");
             errorFile.open("w");
             errorFile.write("ERROR: " + e.toString());
             errorFile.close();

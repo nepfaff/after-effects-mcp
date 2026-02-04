@@ -868,6 +868,16 @@ if (typeof JSON.stringify !== "function") {
     })();
 }
 
+// Detect After Effects version (AE 2025 is version 25.x)
+var isAE2025OrLater = (function () {
+    try {
+        var v = parseFloat(app.version);
+        return v >= 25;
+    } catch (e) {
+        return false;
+    }
+})();
+
 // Always create a floating palette window for AE 2025+
 var panel = new Window("palette", "MCP Bridge Auto", undefined);
 panel.orientation = "column";
@@ -900,16 +910,25 @@ autoRunCheckbox.value = true;
 var checkInterval = 2000;
 var isChecking = false;
 
+// Bridge directory shared with the Node.js MCP server.
+// Uses ~/Documents/ae-mcp-bridge/ so both ExtendScript (Folder.myDocuments)
+// and Node.js (os.homedir() + '/Documents') resolve to the same path.
+function getBridgeFolder() {
+    var bridgeFolder = new Folder(Folder.myDocuments.fsName + "/ae-mcp-bridge");
+    if (!bridgeFolder.exists) {
+        bridgeFolder.create();
+    }
+    return bridgeFolder;
+}
+
 // Command file path
 function getCommandFilePath() {
-    var tempFolder = Folder.temp;
-    return tempFolder.fsName + "/ae_command.json";
+    return getBridgeFolder().fsName + "/ae_command.json";
 }
 
 // Result file path
 function getResultFilePath() {
-    var tempFolder = Folder.temp;
-    return tempFolder.fsName + "/ae_mcp_result.json";
+    return getBridgeFolder().fsName + "/ae_mcp_result.json";
 }
 
 // Functions for each script type
